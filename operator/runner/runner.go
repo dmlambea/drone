@@ -314,6 +314,24 @@ func (r *Runner) Run(ctx context.Context, id int64) error {
 		),
 		transform.WithNetworks(r.Networks),
 		transform.WithProxy(),
+		// populate manifest with VolumeSecret secrets, before
+		// transforming with WithSecretFunc below.
+		withVolumeSecretFunc(
+			func(secret, path, name string) *engine.Secret {
+				s := &yaml.Secret{
+					Kind: "secret",
+					Name: secret,
+					Get: yaml.SecretGet{
+						Name: name,
+						Path: path,
+					},
+				}
+				manifest.Resources = append(manifest.Resources, s)
+				return &engine.Secret{
+					Metadata: engine.Metadata{Name: secret},
+				}
+			},
+		),
 		transform.WithSecretFunc(
 			func(name string) *engine.Secret {
 				in := &core.SecretArgs{

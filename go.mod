@@ -1,5 +1,10 @@
 module github.com/drone/drone
 
+replace (
+	github.com/drone/drone-runtime => github.com/dmlambea/drone-runtime v1.0.7-0.20190711102931-0918921bfd68
+	github.com/drone/drone-yaml => github.com/dmlambea/drone-yaml v1.1.4-0.20190711130638-6ebc10a9a71b
+)
+
 require (
 	docker.io/go-docker v1.0.0
 	github.com/99designs/httpsignatures-go v0.0.0-20170731043157-88528bf4ca7e

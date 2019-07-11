@@ -14,7 +14,12 @@
 
 package runner
 
-import "github.com/drone/drone/core"
+import (
+	"fmt"
+
+	"github.com/drone/drone-runtime/engine"
+	"github.com/drone/drone/core"
+)
 
 func toSecretMap(secrets []*core.Secret) map[string]string {
 	set := map[string]string{}
@@ -22,4 +27,54 @@ func toSecretMap(secrets []*core.Secret) map[string]string {
 		set[secret.Name] = secret.Data
 	}
 	return set
+}
+
+// volumeSecretFunc is a callback function used to preprocess
+// all the VolumeSecret secrets.
+type volumeSecretFunc func(secret, path, name string) *engine.Secret
+
+// secretNameKey is a simple struct to hold secrets' name-key pairs
+type secretNameKey struct {
+	name string
+	key  string
+}
+
+// withVolumeSecretFunc is a transform function that preprocesses
+// all the VolumeSecrets in the specification so that their secrets
+// are dynamically created as if they were manually typed into the
+// YAML.
+func withVolumeSecretFunc(f volumeSecretFunc) func(*engine.Spec) {
+	return func(spec *engine.Spec) {
+		if spec.Docker == nil {
+			return
+		}
+
+		// first we get a unique list of all
+		// VolumeSecret used by the specification.
+		set := map[string]secretNameKey{}
+		for _, vol := range spec.Docker.Volumes {
+			if vol.Secret == nil {
+				continue
+			}
+			for _, item := range vol.Secret.Items {
+				globalSecretName := fmt.Sprintf("%s-%s-%s",
+					vol.Metadata.Name,
+					vol.Secret.Name,
+					item.Key)
+				set[globalSecretName] = secretNameKey{
+					name: vol.Secret.Name,
+					key:  item.Key,
+				}
+			}
+		}
+
+		// next we use the callback to process the secret in manifest and
+		// the steps that refer to it
+		for secretName, secretData := range set {
+			secret := f(secretName, secretData.name, secretData.key)
+			if secret != nil {
+				spec.Secrets = append(spec.Secrets, secret)
+			}
+		}
+	}
 }
